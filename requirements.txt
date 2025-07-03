@@ -1,0 +1,8 @@
+psutil~=7.0.0
+pynput~=1.8.1
+pygetwindow
+pandas~=2.3.0
+scikit-learn~=1.7.0
+joblib~=1.5.1
+keyboard
+numpy~=2.3.1
