@@ -201,8 +201,10 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
-
+fake_keyloger/log/*.txt
 # Marimo
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+fake_keyloger/log/
+*.txt
