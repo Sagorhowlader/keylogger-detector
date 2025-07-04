@@ -1,9 +1,11 @@
 import platform
+import time
 
 import winsound
-import time
+
 from monitor.system_monitor import SystemMonitor
 from real_time_anomaly_detector import anomaly_detector
+
 monitor_only = False
 
 
@@ -18,38 +20,33 @@ def beep():
 
 
 if __name__ == "__main__":
-    interval = 2
-    monitor_only = True
+    interval = 0.5
+    monitor_only = False
     anomaly_detector_software = True
 
     try:
         if monitor_only:
             monitor = SystemMonitor(interval=interval)
-
-            # Load detector once
-            detector = anomaly_detector.RealTimeAnomalyDetector(
-                model_path="models/trained_model/svm_model.pkl",
-                scaler_path="models/trained_model/scaler.pkl"
-            )
-
+            monitor.start()
             while True:
-                time.sleep(interval)
+                time.sleep(5)
                 real_time_data = monitor.get_realtime_metrics()
-                print("Real time data ", real_time_data)
+                print("real_time_data:", real_time_data)
 
+                detector = anomaly_detector.RealTimeAnomalyDetector(
+                    model_path="models/trained_model/random_forest_model.pkl",
+                    scaler_path="models/trained_model/scaler.pkl"
+                )
                 prob = detector.predict_probability(real_time_data)
                 print(f"Anomaly Probability: {prob:.2f}")
 
                 if detector.alert_if_anomaly(real_time_data) == 1:
                     beep()
+                    print("🛑  Anamoly Detected.")
                 else:
                     print("✅ Normal Detected")
-
         else:
-            file_name_input = input("Enter output file name: ").strip()
-            file_name = f"data/{file_name_input}"
-            file_format = file_name.split('.')[-1].lower()
-            monitor = SystemMonitor(interval=5, file_path=file_name, label=0, file_format='csv')
+            monitor = SystemMonitor(interval=interval, label=0, file_name='normal.csv',mode="monitor")
             monitor.start()
 
     except KeyboardInterrupt:

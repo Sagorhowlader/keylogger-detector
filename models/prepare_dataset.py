@@ -1,27 +1,21 @@
 import os
 import re
-from pathlib import Path
 
 import pandas as pd
 from sklearn.utils import shuffle
 
-from utils.file_manager import FileManager
+from utils.file_manager import FileManager, project_path
 
 
 class DatasetPreparer:
-    def __init__(self, data_dir='data', output_file='data/prepared_dataset.csv'):
+    def __init__(self, output_file='data/prepared_dataset.csv'):
         # Get project root using FileManager
-        project_root = Path(FileManager(file_path=output_file).get_file_path())
-
+        self.file_path = project_path(output_file)
+        self.data_dir = project_path('data')
         # Resolve paths relative to project root
-        self.data_dir = project_root / data_dir
-        self.output_file = project_root / output_file
-
         # Set up FileManager to save the prepared dataset
-        self.file_manager = FileManager(str(self.output_file), file_format='csv', header=None, mode='w')
-
-        print('[*] Data directory:', self.data_dir)
-        print('[*] Output file:', self.output_file)
+        self.file_manager = FileManager(str(self.file_path), file_format='csv', header=None, mode='w')
+        print('[*] Output file:', self.file_path)
 
     def load_labeled_data(self, label_value, prefix):
         """Load and label all CSV files matching the given prefix."""
@@ -57,9 +51,9 @@ class DatasetPreparer:
         # Save using FileManager
         self.file_manager.save_dataframe(combined_df)
         self.file_manager.close()
-        print(f"[✓] Prepared dataset saved to: {self.output_file}")
+        print(f"[✓] Prepared dataset saved to: {self.file_path}")
 
 
 if __name__ == "__main__":
-    preparer = DatasetPreparer(data_dir="data", output_file="data/prepared_dataset.csv")
+    preparer = DatasetPreparer(output_file="data/prepared_dataset.csv")
     preparer.prepare()
